@@ -62,6 +62,22 @@ contract MultiSigTest is Test {
         s_multiSig = new MultiSig(totalNumberOfOwners, minimumRequiredSigners, s_owners);
     }
 
+    function testDeploymentFailsIfThereIsDuplicateOwner() external {
+        uint8 totalNumberOfOwners = 3;
+        uint8 minimumRequiredSigners = 2;
+
+        for (uint8 i = 1; i <= totalNumberOfOwners;) {
+            s_owners.push(address(1));
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        vm.expectRevert(abi.encodeWithSelector(MultiSig.DuplicateOwner.selector, address(1)));
+        s_multiSig = new MultiSig(totalNumberOfOwners, minimumRequiredSigners, s_owners);
+    }
+
     function testTotalNumberOfOwnersIsCorrect() external view {
         uint8 expectedTotalNumberOfOwners = s_deployer.TOTAL_NUMBER_OF_OWNERS();
         uint8 actualTotalNumberOfOwners = s_multiSig.getTotalNumberOfOwners();

@@ -7,10 +7,12 @@ contract MultiSig {
     error InvalidAmountOfSigners();
     error InvalidOwnersLength();
     error OwnerCantBeZeroAddress();
+    error DuplicateOwner(address owner);
 
     uint8 private immutable i_totalNumberOfOwners;
     uint8 private immutable i_minimumRequiredSigners;
     address[] private s_owners;
+    mapping(address owner => bool isOwner) private s_addressIsOwner;
 
     /// @param totalNumberOfOwners This is the total number of owners
     /// @param minimumRequiredSigners This is the minimum number of signers
@@ -26,17 +28,20 @@ contract MultiSig {
             revert InvalidOwnersLength();
         }
 
-        // DODAJ PROVJERU ZA DUPLE ADRESE
-
         i_totalNumberOfOwners = totalNumberOfOwners;
         i_minimumRequiredSigners = minimumRequiredSigners;
 
         for (uint8 i = 0; i < totalNumberOfOwners;) {
-            if (owners[i] == address(0)) {
+            address owner = owners[i];
+            if (owner == address(0)) {
                 revert OwnerCantBeZeroAddress();
             }
+            if (s_addressIsOwner[owner]) {
+                revert DuplicateOwner(owner);
+            }
 
-            s_owners.push(owners[i]);
+            s_addressIsOwner[owner] = true;
+            s_owners.push(owner);
 
             unchecked {
                 ++i;

@@ -3,16 +3,16 @@
 pragma solidity ^0.8.26;
 
 contract MultiSig {
+    uint8 private immutable i_totalNumberOfOwners;
+    uint8 private immutable i_minimumRequiredSigners;
+    address[] private s_owners;
+    mapping(address owner => bool isOwner) private s_addressIsOwner;
+
     error MinimumRequiredSignersCantBeZero();
     error InvalidAmountOfSigners();
     error InvalidOwnersLength();
     error OwnerCantBeZeroAddress();
     error DuplicateOwner(address owner);
-
-    uint8 private immutable i_totalNumberOfOwners;
-    uint8 private immutable i_minimumRequiredSigners;
-    address[] private s_owners;
-    mapping(address owner => bool isOwner) private s_addressIsOwner;
 
     /// @param totalNumberOfOwners This is the total number of owners
     /// @param minimumRequiredSigners This is the minimum number of signers
@@ -21,9 +21,11 @@ contract MultiSig {
         if (minimumRequiredSigners == 0) {
             revert MinimumRequiredSignersCantBeZero();
         }
+
         if (totalNumberOfOwners < minimumRequiredSigners) {
             revert InvalidAmountOfSigners();
         }
+
         if (totalNumberOfOwners != owners.length) {
             revert InvalidOwnersLength();
         }
@@ -36,6 +38,7 @@ contract MultiSig {
             if (owner == address(0)) {
                 revert OwnerCantBeZeroAddress();
             }
+
             if (s_addressIsOwner[owner]) {
                 revert DuplicateOwner(owner);
             }

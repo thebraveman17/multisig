@@ -3,16 +3,40 @@
 pragma solidity ^0.8.26;
 
 contract MultiSig {
+    enum TransactionStatus {
+        Pending,
+        Executed
+    }
+
+    struct TransactionData {
+        address to;
+        uint256 value;
+        bytes data;
+        TransactionStatus transactionStatus;
+    }
+
+    TransactionData[] private s_transactions;
     uint8 private immutable i_totalNumberOfOwners;
     uint8 private immutable i_minimumRequiredSigners;
     address[] private s_owners;
     mapping(address owner => bool isOwner) private s_addressIsOwner;
+
+    event TransactionCreated(address owner, address to, uint256 value, bytes data);
 
     error MinimumRequiredSignersCantBeZero();
     error InvalidAmountOfSigners();
     error InvalidOwnersLength();
     error OwnerCantBeZeroAddress();
     error DuplicateOwner(address owner);
+    error NotOwner();
+    error ReceiverIsZeroAddress();
+
+    modifier onlyOwner() {
+        if (!s_addressIsOwner[msg.sender]) {
+            revert NotOwner();
+        }
+        _;
+    }
 
     /// @param totalNumberOfOwners This is the total number of owners
     /// @param minimumRequiredSigners This is the minimum number of signers
@@ -49,6 +73,13 @@ contract MultiSig {
             unchecked {
                 ++i;
             }
+        }
+    }
+
+    // TO DO
+    function createTransaction(address to, uint256 value, bytes memory data) external onlyOwner {
+        if (to == address(0)) {
+            revert ReceiverIsZeroAddress();
         }
     }
 

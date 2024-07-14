@@ -10,6 +10,9 @@ contract MultiSigTest is Test {
     MultiSig private s_multiSig;
     DeployMultiSig private s_deployer;
     address[] private s_owners;
+    address private immutable i_receiver = makeAddr("receiver");
+    uint256 private constant VALUE = 1e18;
+    bytes private constant CALLDATA = "0x00";
 
     function setUp() external {
         s_deployer = new DeployMultiSig();
@@ -101,6 +104,42 @@ contract MultiSigTest is Test {
                 ++i;
             }
         }
+    }
+
+    function testCreateTransactionFailsIfSenderIsNotOwner() external {
+        vm.expectRevert(MultiSig.NotOwner.selector);
+        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA);
+    }
+
+    function testCreateTransactionFailsIfReceiverIsZeroAddress() external {
+        vm.prank(address(1));
+        vm.expectRevert(MultiSig.ReceiverIsZeroAddress.selector);
+        s_multiSig.createTransaction(address(0), VALUE, CALLDATA);
+    }
+
+    // TO DO: Test createTransaction
+
+    function testApproveTransactionFailsIfSenderIsNotOwner() external {
+        vm.expectRevert(MultiSig.NotOwner.selector);
+        s_multiSig.approveTransaction(0);
+    }
+
+    function testApproveTransactionFailsIfTransactionDoesntExist() external {
+        vm.prank(address(1));
+        vm.expectRevert(MultiSig.TransactionDoesntExist.selector);
+        s_multiSig.approveTransaction(0);
+    }
+
+    // TO DO
+    function testApproveTransactionFailsIfTransactionIsAlreadyExecuted() external {}
+
+    function testApproveTransactionFailsIfTransactionIsAlreadyApproved() external {
+        vm.deal(address(2), VALUE);
+        vm.startPrank(address(2));
+        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA);
+        vm.expectRevert(MultiSig.TransactionAlreadyApproved.selector);
+        s_multiSig.approveTransaction(0);
+        vm.stopPrank();
     }
 
     function _initializeOwnersArray(uint8 totalNumberOfOwners) private {

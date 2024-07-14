@@ -90,8 +90,10 @@ contract MultiSig {
             revert ReceiverIsZeroAddress();
         }
 
+        uint64 transactionID = uint64(s_transactions.length);
         s_transactions.push(Transaction(to, value, data, TransactionStatus.PendingApprovals));
-        emit TransactionCreated(uint64(s_transactions.length), msg.sender, to, value, data);
+        s_transactionIsApproved[transactionID][msg.sender] = true;
+        emit TransactionCreated(transactionID, msg.sender, to, value, data);
     }
 
     /// @notice This function approves a transaction with the given ID

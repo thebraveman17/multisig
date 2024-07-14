@@ -4,24 +4,26 @@ pragma solidity ^0.8.26;
 
 contract MultiSig {
     enum TransactionStatus {
-        Pending,
+        PendingApprovals,
         Executed
     }
 
-    struct TransactionData {
+    struct Transaction {
         address to;
         uint256 value;
         bytes data;
         TransactionStatus transactionStatus;
     }
 
-    TransactionData[] private s_transactions;
+    Transaction[] private s_transactions;
     uint8 private immutable i_totalNumberOfOwners;
     uint8 private immutable i_minimumRequiredSigners;
     address[] private s_owners;
     mapping(address owner => bool isOwner) private s_addressIsOwner;
+    mapping(uint64 transactionID => mapping(address owner => bool isApproved)) private s_transactionIsApproved;
 
-    event TransactionCreated(address owner, address to, uint256 value, bytes data);
+    event TransactionCreated(uint64 traansactionID, address owner, address to, uint256 value, bytes data);
+    event TransactionApproved(uint64 transactionID, address owner);
 
     error MinimumRequiredSignersCantBeZero();
     error InvalidAmountOfSigners();
@@ -30,6 +32,9 @@ contract MultiSig {
     error DuplicateOwner(address owner);
     error NotOwner();
     error ReceiverIsZeroAddress();
+    error TransactionDoesntExist();
+    error TransactionAlreadyApproved();
+    error TransactionAlreadyExecuted();
 
     modifier onlyOwner() {
         if (!s_addressIsOwner[msg.sender]) {
@@ -76,11 +81,37 @@ contract MultiSig {
         }
     }
 
-    // TO DO
+    /// @notice This function creates a new transaction
+    /// @param to The address of the receiver
+    /// @param value The value to send
+    /// @param data The calldata
     function createTransaction(address to, uint256 value, bytes memory data) external onlyOwner {
         if (to == address(0)) {
             revert ReceiverIsZeroAddress();
         }
+
+        s_transactions.push(Transaction(to, value, data, TransactionStatus.PendingApprovals));
+        emit TransactionCreated(uint64(s_transactions.length), msg.sender, to, value, data);
+    }
+
+    /// @notice This function approves a transaction with the given ID
+    /// @param transactionID The ID of the transaction
+    function approveTransaction(uint64 transactionID) external onlyOwner {
+        if (transactionID >= s_transactions.length) {
+            revert TransactionDoesntExist();
+        }
+
+        if (s_transactions[transactionID].transactionStatus == TransactionStatus.Executed) {
+            revert TransactionAlreadyExecuted();
+        }
+
+        if (s_transactionIsApproved[transactionID][msg.sender]) {
+            revert TransactionAlreadyApproved();
+        }
+
+        s_transactionIsApproved[transactionID][msg.sender] = true;
+
+        emit TransactionApproved(transactionID, msg.sender);
     }
 
     /// @notice This function returns the total number of owners

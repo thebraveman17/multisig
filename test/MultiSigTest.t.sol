@@ -14,6 +14,12 @@ contract MultiSigTest is Test {
     uint256 private constant VALUE = 1e18;
     bytes private constant CALLDATA = "0x00";
 
+    modifier transactionCreated() {
+        vm.prank(_getOwner(0));
+        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA);
+        _;
+    }
+
     function setUp() external {
         s_deployer = new DeployMultiSig();
         s_multiSig = s_deployer.run();
@@ -117,7 +123,19 @@ contract MultiSigTest is Test {
         s_multiSig.createTransaction(address(0), VALUE, CALLDATA);
     }
 
-    // TO DO: Test createTransaction
+    function testCreateTransactionStateIsUpdatedCorrectlyAndEventIsEmitted() external {
+        vm.startPrank(address(1));
+        vm.expectEmit(true, true, false, true);
+        emit MultiSig.TransactionCreated(0, address(1), i_receiver, VALUE, CALLDATA);
+        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA);
+        (address actualReceiver, uint256 actualValue, bytes memory actualCalldata, uint8 transactionStatus) =
+            s_multiSig.getTransaction(0);
+        assertEq(i_receiver, actualReceiver);
+        assertEq(VALUE, actualValue);
+        assertEq(CALLDATA, actualCalldata);
+        assertEq(0, transactionStatus);
+        vm.stopPrank();
+    }
 
     function testApproveTransactionFailsIfSenderIsNotOwner() external {
         vm.expectRevert(MultiSig.NotOwner.selector);
@@ -142,6 +160,16 @@ contract MultiSigTest is Test {
         vm.stopPrank();
     }
 
+    function testApproveTransactionStateUpdatesAndEvents() external transactionCreated {
+        address owner = _getOwner(1);
+        vm.prank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit MultiSig.TransactionApproved(0, owner);
+        s_multiSig.approveTransaction(0);
+        bool actualApprovalStatus = s_multiSig.getApprovalStatus(0, owner);
+        assertEq(actualApprovalStatus, true);
+    }
+
     function _initializeOwnersArray(uint8 totalNumberOfOwners) private {
         for (uint8 i = 1; i <= totalNumberOfOwners;) {
             s_owners.push(address(uint160(i)));
@@ -150,5 +178,9 @@ contract MultiSigTest is Test {
                 ++i;
             }
         }
+    }
+
+    function _getOwner(uint256 index) private view returns (address) {
+        return s_multiSig.getOwners()[index];
     }
 }

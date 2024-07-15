@@ -22,8 +22,10 @@ contract MultiSig {
     mapping(address owner => bool isOwner) private s_addressIsOwner;
     mapping(uint64 transactionID => mapping(address owner => bool isApproved)) private s_transactionIsApproved;
 
-    event TransactionCreated(uint64 traansactionID, address owner, address to, uint256 value, bytes data);
-    event TransactionApproved(uint64 transactionID, address owner);
+    event TransactionCreated(
+        uint64 transactionID, address indexed owner, address indexed to, uint256 value, bytes data
+    );
+    event TransactionApproved(uint64 transactionID, address indexed owner);
 
     error MinimumRequiredSignersCantBeZero();
     error InvalidAmountOfSigners();
@@ -36,9 +38,30 @@ contract MultiSig {
     error TransactionAlreadyApproved();
     error TransactionAlreadyExecuted();
 
-    modifier onlyOwner() {
-        if (!s_addressIsOwner[msg.sender]) {
+    modifier onlyOwner(address addr) {
+        if (!s_addressIsOwner[addr]) {
             revert NotOwner();
+        }
+        _;
+    }
+
+    modifier transactionExists(uint64 transactionID) {
+        if (transactionID >= s_transactions.length) {
+            revert TransactionDoesntExist();
+        }
+        _;
+    }
+
+    modifier notExecuted(uint64 transactionID) {
+        if (s_transactions[transactionID].transactionStatus == TransactionStatus.Executed) {
+            revert TransactionAlreadyExecuted();
+        }
+        _;
+    }
+
+    modifier notApproved(uint64 transactionID) {
+        if (s_transactionIsApproved[transactionID][msg.sender]) {
+            revert TransactionAlreadyApproved();
         }
         _;
     }
@@ -85,7 +108,7 @@ contract MultiSig {
     /// @param to The address of the receiver
     /// @param value The value to send
     /// @param data The calldata
-    function createTransaction(address to, uint256 value, bytes memory data) external onlyOwner {
+    function createTransaction(address to, uint256 value, bytes memory data) external onlyOwner(msg.sender) {
         if (to == address(0)) {
             revert ReceiverIsZeroAddress();
         }
@@ -98,19 +121,13 @@ contract MultiSig {
 
     /// @notice This function approves a transaction with the given ID
     /// @param transactionID The ID of the transaction
-    function approveTransaction(uint64 transactionID) external onlyOwner {
-        if (transactionID >= s_transactions.length) {
-            revert TransactionDoesntExist();
-        }
-
-        if (s_transactions[transactionID].transactionStatus == TransactionStatus.Executed) {
-            revert TransactionAlreadyExecuted();
-        }
-
-        if (s_transactionIsApproved[transactionID][msg.sender]) {
-            revert TransactionAlreadyApproved();
-        }
-
+    function approveTransaction(uint64 transactionID)
+        external
+        onlyOwner(msg.sender)
+        transactionExists(transactionID)
+        notExecuted(transactionID)
+        notApproved(transactionID)
+    {
         s_transactionIsApproved[transactionID][msg.sender] = true;
 
         emit TransactionApproved(transactionID, msg.sender);
@@ -129,5 +146,26 @@ contract MultiSig {
     /// @notice This function returns the list of owners
     function getOwners() external view returns (address[] memory) {
         return s_owners;
+    }
+
+    /// @notice This function returns the approval status for the given transactionID and owner
+    function getApprovalStatus(uint64 transactionID, address owner)
+        external
+        view
+        onlyOwner(owner)
+        transactionExists(transactionID)
+        returns (bool)
+    {
+        return s_transactionIsApproved[transactionID][owner];
+    }
+
+    /// @notice This function returns the transaction with the given ID
+    function getTransaction(uint64 transactionID) external view returns (address, uint256, bytes memory, uint8) {
+        return (
+            s_transactions[transactionID].to,
+            s_transactions[transactionID].value,
+            s_transactions[transactionID].data,
+            uint8(s_transactions[transactionID].transactionStatus)
+        );
     }
 }

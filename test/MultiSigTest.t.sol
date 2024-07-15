@@ -13,10 +13,11 @@ contract MultiSigTest is Test {
     address private immutable i_receiver = makeAddr("receiver");
     uint256 private constant VALUE = 1e18;
     bytes private constant CALLDATA = "0x00";
+    string private constant DESCRIPTION = "Description";
 
     modifier transactionCreated() {
         vm.prank(_getOwner(0));
-        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA);
+        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA, DESCRIPTION);
         _;
     }
 
@@ -114,20 +115,20 @@ contract MultiSigTest is Test {
 
     function testCreateTransactionFailsIfSenderIsNotOwner() external {
         vm.expectRevert(MultiSig.NotOwner.selector);
-        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA);
+        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA, DESCRIPTION);
     }
 
     function testCreateTransactionFailsIfReceiverIsZeroAddress() external {
         vm.prank(address(1));
         vm.expectRevert(MultiSig.ReceiverIsZeroAddress.selector);
-        s_multiSig.createTransaction(address(0), VALUE, CALLDATA);
+        s_multiSig.createTransaction(address(0), VALUE, CALLDATA, DESCRIPTION);
     }
 
     function testCreateTransactionStateIsUpdatedCorrectlyAndEventIsEmitted() external {
         vm.startPrank(address(1));
         vm.expectEmit(true, true, false, true);
-        emit MultiSig.TransactionCreated(0, address(1), i_receiver, VALUE, CALLDATA);
-        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA);
+        emit MultiSig.TransactionCreated(0, address(1), i_receiver, VALUE, CALLDATA, DESCRIPTION);
+        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA, DESCRIPTION);
         (address actualReceiver, uint256 actualValue, bytes memory actualCalldata, uint8 transactionStatus) =
             s_multiSig.getTransaction(0);
         assertEq(i_receiver, actualReceiver);
@@ -154,7 +155,7 @@ contract MultiSigTest is Test {
     function testApproveTransactionFailsIfTransactionIsAlreadyApproved() external {
         vm.deal(address(2), VALUE);
         vm.startPrank(address(2));
-        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA);
+        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA, DESCRIPTION);
         vm.expectRevert(MultiSig.TransactionAlreadyApproved.selector);
         s_multiSig.approveTransaction(0);
         vm.stopPrank();
@@ -168,6 +169,33 @@ contract MultiSigTest is Test {
         s_multiSig.approveTransaction(0);
         bool actualApprovalStatus = s_multiSig.getApprovalStatus(0, owner);
         assertEq(actualApprovalStatus, true);
+    }
+
+    function testRevokeApprovalFailsIfSenderIsNotOwner() external transactionCreated {
+        vm.expectRevert(MultiSig.NotOwner.selector);
+        s_multiSig.revokeApproval(0);
+    }
+
+    function testRevokeApprovalFailsIfTransactionDoesntExist() external {
+        vm.prank(_getOwner(0));
+        vm.expectRevert(MultiSig.TransactionDoesntExist.selector);
+        s_multiSig.revokeApproval(0);
+    }
+
+    function testRevokeApprovalFailsIfTransactionIsntApproved() external transactionCreated {
+        vm.prank(_getOwner(1));
+        vm.expectRevert(MultiSig.TransactionNotApproved.selector);
+        s_multiSig.revokeApproval(0);
+    }
+
+    function testRevokeApprovalStateIsUpdatedCorrectlyAndEventIsEmitted() external transactionCreated {
+        vm.startPrank(_getOwner(0));
+        vm.expectEmit(true, false, false, true);
+        emit MultiSig.ApprovalRevoked(0, _getOwner(0));
+        s_multiSig.revokeApproval(0);
+        vm.stopPrank();
+        bool actualApprovalStatus = s_multiSig.getApprovalStatus(0, _getOwner(0));
+        assertEq(actualApprovalStatus, false);
     }
 
     function _initializeOwnersArray(uint8 totalNumberOfOwners) private {

@@ -26,6 +26,7 @@ contract MultiSig {
         uint64 transactionID, address indexed owner, address indexed to, uint256 value, bytes data
     );
     event TransactionApproved(uint64 transactionID, address indexed owner);
+    event ApprovalRevoked(uint64 transactionID, address indexed owner);
 
     error MinimumRequiredSignersCantBeZero();
     error InvalidAmountOfSigners();
@@ -37,6 +38,7 @@ contract MultiSig {
     error TransactionDoesntExist();
     error TransactionAlreadyApproved();
     error TransactionAlreadyExecuted();
+    error TransactionNotApproved();
 
     modifier onlyOwner(address addr) {
         if (!s_addressIsOwner[addr]) {
@@ -131,6 +133,23 @@ contract MultiSig {
         s_transactionIsApproved[transactionID][msg.sender] = true;
 
         emit TransactionApproved(transactionID, msg.sender);
+    }
+
+    /// @notice This function revokes approval for the given transactionID
+    /// @param transactionID The ID of the transaction
+    function revokeApproval(uint64 transactionID)
+        external
+        onlyOwner(msg.sender)
+        transactionExists(transactionID)
+        notExecuted(transactionID)
+    {
+        if (!s_transactionIsApproved[transactionID][msg.sender]) {
+            revert TransactionNotApproved();
+        }
+
+        s_transactionIsApproved[transactionID][msg.sender] = false;
+
+        emit ApprovalRevoked(transactionID, msg.sender);
     }
 
     /// @notice This function returns the total number of owners

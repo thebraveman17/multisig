@@ -46,7 +46,7 @@ contract MultiSig {
     error TransactionNotApproved();
     error NotEnoughApprovals(uint8 numberOfApprovals);
     error TransactionFailed();
-    error AddressIsNotOwner(address a);
+    error AddressIsNotOwner();
 
     modifier onlyOwner() {
         if (!s_addressIsOwner[msg.sender]) {
@@ -136,7 +136,7 @@ contract MultiSig {
         emit TransactionCreated(transactionID, msg.sender, to, value, data, description);
     }
 
-    /// @notice This function approves a transaction with the given ID
+    /// @notice This function approves a transaction with the given transaction ID
     /// @param transactionID The ID of the transaction
     function approveTransaction(uint64 transactionID)
         external
@@ -150,6 +150,7 @@ contract MultiSig {
         emit TransactionApproved(transactionID, msg.sender);
     }
 
+    /// @notice This function executes a transaction with the given transaction ID
     function executeTransaction(uint64 transactionID)
         external
         onlyOwner
@@ -175,7 +176,7 @@ contract MultiSig {
         );
     }
 
-    /// @notice This function revokes approval for the given transactionID
+    /// @notice This function revokes approval for the given transaction ID
     /// @param transactionID The ID of the transaction
     function revokeApproval(uint64 transactionID)
         external
@@ -207,7 +208,7 @@ contract MultiSig {
         return s_owners;
     }
 
-    /// @notice This function returns the approval status for the given transactionID and owner
+    /// @notice This function returns the approval status for the given transaction ID and owner
     function getApprovalStatus(uint64 transactionID, address owner)
         external
         view
@@ -215,12 +216,13 @@ contract MultiSig {
         returns (bool)
     {
         if (!s_addressIsOwner[owner]) {
-            revert AddressIsNotOwner(owner);
+            revert AddressIsNotOwner();
         }
+
         return s_transactionIsApproved[transactionID][owner];
     }
 
-    /// @notice This function returns the transaction with the given ID
+    /// @notice This function returns the transaction with the given transaction ID
     function getTransaction(uint64 transactionID) external view returns (address, uint256, bytes memory, uint8) {
         return (
             s_transactions[transactionID].to,
@@ -230,7 +232,7 @@ contract MultiSig {
         );
     }
 
-    /// @notice This function returns the number of approvals for the given transactionID
+    /// @notice This function returns the number of approvals for the given transaction ID
     function _getNumberOfApprovals(uint64 transactionID) private view returns (uint8) {
         uint8 numberOfApprovals = 0;
         uint8 ownersLength = uint8(s_owners.length);

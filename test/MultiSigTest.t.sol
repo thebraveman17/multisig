@@ -5,6 +5,7 @@ pragma solidity ^0.8.26;
 import {Test, console} from "forge-std/Test.sol";
 import {DeployMultiSig} from "../script/DeployMultiSig.s.sol";
 import {MultiSig} from "../src/MultiSig.sol";
+import {FailingTransactionContract} from "./FailingTransactionContract.sol";
 
 contract MultiSigTest is Test {
     MultiSig private s_multiSig;
@@ -18,6 +19,17 @@ contract MultiSigTest is Test {
     modifier transactionCreated() {
         vm.prank(_getOwner(0));
         s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA, DESCRIPTION);
+        _;
+    }
+
+    modifier transactionExecuted() {
+        vm.deal(address(s_multiSig), VALUE);
+        vm.prank(_getOwner(0));
+        s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA, DESCRIPTION);
+        vm.startPrank(_getOwner(1));
+        s_multiSig.approveTransaction(0);
+        s_multiSig.executeTransaction(0);
+        vm.stopPrank();
         _;
     }
 
@@ -144,17 +156,19 @@ contract MultiSigTest is Test {
     }
 
     function testApproveTransactionFailsIfTransactionDoesntExist() external {
-        vm.prank(address(1));
+        vm.prank(_getOwner(0));
         vm.expectRevert(MultiSig.TransactionDoesntExist.selector);
         s_multiSig.approveTransaction(0);
     }
 
-    // TO DO
-    function testApproveTransactionFailsIfTransactionIsAlreadyExecuted() external {}
+    function testApproveTransactionFailsIfTransactionIsAlreadyExecuted() external transactionExecuted {
+        vm.prank(_getOwner(2));
+        vm.expectRevert(MultiSig.TransactionAlreadyExecuted.selector);
+        s_multiSig.approveTransaction(0);
+    }
 
     function testApproveTransactionFailsIfTransactionIsAlreadyApproved() external {
-        vm.deal(address(2), VALUE);
-        vm.startPrank(address(2));
+        vm.startPrank(_getOwner(1));
         s_multiSig.createTransaction(i_receiver, VALUE, CALLDATA, DESCRIPTION);
         vm.expectRevert(MultiSig.TransactionAlreadyApproved.selector);
         s_multiSig.approveTransaction(0);
@@ -196,6 +210,57 @@ contract MultiSigTest is Test {
         vm.stopPrank();
         bool actualApprovalStatus = s_multiSig.getApprovalStatus(0, _getOwner(0));
         assertEq(actualApprovalStatus, false);
+    }
+
+    function testExecuteTransactionFailsIfSenderIsNotOwner() external {
+        vm.expectRevert(MultiSig.NotOwner.selector);
+        s_multiSig.executeTransaction(0);
+    }
+
+    function testExecuteTransactionFailsIfTransactionDoesntExist() external {
+        vm.prank(_getOwner(0));
+        vm.expectRevert(MultiSig.TransactionDoesntExist.selector);
+        s_multiSig.executeTransaction(0);
+    }
+
+    function testExecuteTransactionFailsIfThereArentEnoughApprovals() external transactionCreated {
+        vm.prank(_getOwner(0));
+        vm.expectRevert(abi.encodeWithSelector(MultiSig.NotEnoughApprovals.selector, 1));
+        s_multiSig.executeTransaction(0);
+    }
+
+    function testExecuteTransactionFailsIfSendFails() external {
+        FailingTransactionContract failingTransactionContract = new FailingTransactionContract();
+        vm.prank(_getOwner(0));
+        s_multiSig.createTransaction(address(failingTransactionContract), VALUE, CALLDATA, DESCRIPTION);
+        vm.startPrank(_getOwner(1));
+        s_multiSig.approveTransaction(0);
+        vm.expectRevert(MultiSig.TransactionFailed.selector);
+        s_multiSig.executeTransaction(0);
+        vm.stopPrank();
+    }
+
+    function testExecuteFailsIfTransactionIsAlreadyExecuted() external transactionExecuted {
+        vm.prank(_getOwner(0));
+        vm.expectRevert(MultiSig.TransactionAlreadyExecuted.selector);
+        s_multiSig.executeTransaction(0);
+    }
+
+    function testExecuteTransactionUpdatesStateCorrectlyAndEmitsEvent() external transactionCreated {
+        vm.deal(address(s_multiSig), VALUE);
+        vm.startPrank(_getOwner(1));
+        s_multiSig.approveTransaction(0);
+        vm.expectEmit(true, true, false, true);
+        emit MultiSig.TransactionExecuted(0, _getOwner(1), i_receiver, VALUE, CALLDATA, DESCRIPTION);
+        s_multiSig.executeTransaction(0);
+        (,,, uint8 actualTransactionStatus) = s_multiSig.getTransaction(0);
+        assertEq(actualTransactionStatus, 1);
+        vm.stopPrank();
+    }
+
+    function testGetApprovalStatusFailsIfAddressIsNotOwner() external transactionCreated {
+        vm.expectRevert(MultiSig.AddressIsNotOwner.selector);
+        s_multiSig.getApprovalStatus(0, address(55));
     }
 
     function _initializeOwnersArray(uint8 totalNumberOfOwners) private {

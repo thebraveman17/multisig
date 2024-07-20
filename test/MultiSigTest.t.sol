@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.26;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {DeployMultiSig} from "../script/DeployMultiSig.s.sol";
 import {MultiSig} from "../src/MultiSig.sol";
 import {FailingTransactionContract} from "./FailingTransactionContract.sol";
@@ -80,7 +80,7 @@ contract MultiSigTest is Test {
             }
         }
 
-        vm.expectRevert(MultiSig.OwnerCantBeZeroAddress.selector);
+        vm.expectRevert(MultiSig.OwnerIsZeroAddress.selector);
         s_multiSig = new MultiSig(totalNumberOfOwners, minimumRequiredSigners, s_owners);
     }
 
@@ -263,6 +263,7 @@ contract MultiSigTest is Test {
         s_multiSig.getApprovalStatus(0, address(55));
     }
 
+    // This function initializes the owners array starting from address(1) to address(totalNumberOfOwners)
     function _initializeOwnersArray(uint8 totalNumberOfOwners) private {
         for (uint8 i = 1; i <= totalNumberOfOwners;) {
             s_owners.push(address(uint160(i)));
@@ -273,6 +274,7 @@ contract MultiSigTest is Test {
         }
     }
 
+    // This function returns the owner at the given index from the MultiSig contract
     function _getOwner(uint256 index) private view returns (address) {
         return s_multiSig.getOwners()[index];
     }

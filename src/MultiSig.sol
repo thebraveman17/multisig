@@ -36,7 +36,7 @@ contract MultiSig {
     error MinimumRequiredSignersCantBeZero();
     error InvalidAmountOfSigners();
     error InvalidOwnersLength();
-    error OwnerCantBeZeroAddress();
+    error OwnerIsZeroAddress();
     error DuplicateOwner(address owner);
     error NotOwner();
     error ReceiverIsZeroAddress();
@@ -98,7 +98,7 @@ contract MultiSig {
         for (uint8 i = 0; i < totalNumberOfOwners;) {
             address owner = owners[i];
             if (owner == address(0)) {
-                revert OwnerCantBeZeroAddress();
+                revert OwnerIsZeroAddress();
             }
 
             if (s_addressIsOwner[owner]) {
